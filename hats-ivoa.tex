@@ -1,17 +1,19 @@
 \documentclass[11pt,a4paper]{ivoa}
 
+\input tthdefs
+\input gitmeta
+
 \usepackage{xcolor}  % for colored text
 \usepackage{longtable}
 \usepackage{array}
 \usepackage{colortbl}
-
 \usepackage{listings}
+\lstloadlanguages{python}
 \lstset{ %
   backgroundcolor=\color{white},   % choose the background color; you must add \usepackage{color} or \usepackage{xcolor}
   basicstyle=\scriptsize\ttfamily,        % the size of the fonts that are used for the code
   breakatwhitespace=false,         % sets if automatic breaks should only happen at whitespace
   breaklines=true,                 % sets automatic line breaking
-  captionpos=b,                    % sets the caption-position to bottom
   frame=single,                    % adds a frame around the code
   keepspaces=true,                 % keeps spaces in text, useful for keeping indentation of code (possibly needs columns=flexible)
   language={},                 % the language of the code
@@ -22,19 +24,9 @@
   showstringspaces=false,          % underline spaces within strings only
   showtabs=false,                  % show tabs within strings adding particular underscores
   tabsize=2,                       % sets default tabsize to 2 spaces
-  title=\lstname                   % show the filename of files included with \lstinputlisting; also try caption instead of title
 }
 
-\input tthdefs
-\input gitmeta
-
 \title{HATS: A Standard for the Hierarchical Adaptive Tiling Scheme in the Virtual Observatory}
-
-% Borrowed from UCDList.tex
-% having descriptions in a narrow column is painful -- the following
-% is an attempt to define a suitable column style ("D"escription)
-\newcolumntype{D}[1]{>{\raggedright\tolerance=7000\let\newline\\\arraybackslash
-  \hspace{0pt}}p{#1}}
 
 \ivoagroup{Applications}
 
@@ -128,10 +120,11 @@ Here, we discuss how this is achieved and additional concepts that make it easie
 
 The central unit of data storage is the HATS \texttt{catalog}. 
 It stores the data along with the associated metadata needed to access it. 
-The  \texttt{catalog} organization structure is shown in Listing~\ref{fig:exampleCatalogStructure}.
+The  \texttt{catalog} organization structure is shown in Figure~\ref{fig:exampleCatalogStructure}.
 
+\begin{figure}
 \begin{minipage}{\linewidth}
-\begin{lstlisting}[caption=Example catalog directory contents, label=fig:exampleCatalogStructure]
+\begin{lstlisting}
 catalog/
 |-- [REQUIRED] properties
 |-- [RECOMMENDED] partition_info.csv
@@ -150,6 +143,9 @@ catalog/
     +-- Norder=. . ./
 \end{lstlisting}
 \end{minipage}
+\caption{Example catalog directory contents}
+\label{fig:exampleCatalogStructure}
+\end{figure}
 
 The astronomy data is stored in the directory \texttt{dataset}, and further, within the subdirectories that specify the order at which particular part of the dataset is stored. 
 We will discuss the partitioning and data storage in Sections~\ref{sec:hierarchical}, \ref{sec:adaptive} and \ref{sec:parquet}. 
@@ -163,10 +159,11 @@ All tiles of the same HEALPix order are contained within the same prefix \texttt
 To avoid directories becoming too large for some file systems, the tiles are then grouped by a \texttt{Dir} subdirectory prefix,
 where the value of the \texttt{Dir} key is the result of integer division by 10,000 of the pixel number.
 
-We see the directory structure in Listing~\ref{fig:datasetWithLeaf}, showing a dataset with leaf Parquet files at several HEALPix orders.
+We see the directory structure in Figure~\ref{fig:datasetWithLeaf}, showing a dataset with leaf Parquet files at several HEALPix orders.
 
+\begin{figure}
 \begin{minipage}{\linewidth}
-\begin{lstlisting}[caption=Example catalog dataset directory contents, label=fig:datasetWithLeaf]
+\begin{lstlisting}
 dataset/
 |-- . . .
 |-- Norder=6/
@@ -181,16 +178,20 @@ dataset/
 +-- . . .
 \end{lstlisting} 
 \end{minipage}
+\caption{Example catalog dataset directory contents}
+\label{fig:datasetWithLeaf}
+\end{figure}
 
 The data is stored in the Parquet files (discussed in Section \ref{sec:parquet}), with one or multiple files being possible in the final directory, i.e., in the ultimate data leaf.  \par 
 If there are multiple files representing a single data partition, they should be read together, i.e., we consider them to be one single data unit. In this way, small updates can be added to already existing  \texttt{catalogs} with simple, correctly placed, additions of files in existing folders. \par 
 With such functionality, it is possible to continuously update catalogs with small updates, e.g., nightly additions, without the need to rebuild the whole catalog. The price is the imbalance between the sizes of the data leaves, and the dataset needs to be rebuilt once this imbalance becomes too large from the standpoint of the catalog provider.
 
 
-Such a directory structure would appear as shown in Listing~\ref{fig:datasetWithDir}.
+Such a directory structure would appear as shown in Figure~\ref{fig:datasetWithDir}.
 
+\begin{figure}
 \begin{minipage}{\linewidth}
-\begin{lstlisting}[caption=Example catalog dataset directory contents with leaf directories, label=fig:datasetWithDir]
+\begin{lstlisting}
 dataset/
 |-- . . .
 |-- Norder=6/
@@ -209,6 +210,9 @@ dataset/
 +-- . . .
 \end{lstlisting} 
 \end{minipage} 
+\caption{Example catalog dataset directory contents with leaf directories }
+\label{fig:datasetWithDir}
+\end{figure}
 
 \subsubsection{Adaptive Tiling Algorithm} \label{sec:adaptive}
 Unlike static partitioning schemes, HATS adaptively subdivides spatial regions based on data angular density. 
@@ -290,10 +294,11 @@ This greatly speeds up and facilitates the query, as we now only have to load a 
 These are general secondary indexes, and can be built on any column, not just the survey-assigned identifier. \par
 
 An index table has a different directory structure, as the data is no longer partitioned by HEALPix pixels, at any order.
-Instead, we have a flat storage of the parquet files, as shown in Listing~\ref{fig:exampleIndexStructure}.
+Instead, we have a flat storage of the parquet files, as shown in Figure~\ref{fig:exampleIndexStructure}.
 
+\begin{figure}
 \begin{minipage}{\linewidth}
-  \begin{lstlisting}[caption=Example index table directory contents, label=fig:exampleIndexStructure]
+  \begin{lstlisting}
   id_index/
   |-- properties
   +-- dataset/
@@ -305,17 +310,21 @@ Instead, we have a flat storage of the parquet files, as shown in Listing~\ref{f
           |-- . . .
   \end{lstlisting}
 \end{minipage}
-  
+\caption{Example index table directory contents}
+\label{fig:exampleIndexStructure}
+\end{figure}
+
 \subsubsection{Catalog Collection} \label{sec:collection}
 
 Margins and indexes are associated with a single astronomical dataset, and to make this connection clearer and enable friendlier application behavior, tables MAY be grouped together under a single directory called a catalog collection.
 These include the primary data \texttt{catalog} and other \texttt{catalogs} that are optional and are intended either to improve access to the main \texttt{catalog} or to enrich it with additional information. 
 
-In Listing~\ref{fig:exampleCollectionStructure}, we present an overview of this folder structure, including a few common examples of such optional catalogs.
+In Figure~\ref{fig:exampleCollectionStructure}, we present an overview of this folder structure, including a few common examples of such optional catalogs.
 The catalog collection directory MUST contain a \texttt{collection.properties} file, whose content is outlined in Section~\ref{sec:collectionProperties}.
 
+\begin{figure}
 \begin{minipage}{\linewidth}
-\begin{lstlisting}[caption=Example collection directory contents, label=fig:exampleCollectionStructure]
+\begin{lstlisting}
 gaia_dr3/
 |-- collection.properties
 |-- catalog/
@@ -332,6 +341,9 @@ gaia_dr3/
     +-- . . .
 \end{lstlisting}
 \end{minipage}
+\caption{Example collection directory contents}
+\label{fig:exampleCollectionStructure}
+\end{figure}
 
 \subsubsection{Association Table} \label{sec:association}
 
@@ -373,10 +385,11 @@ The ordering of the keywords is not important. The keywords MAY include many of 
 
 The text file may contain comment lines, beginning with the \texttt{'\#'} character.
 
-An example \texttt{properties} file is shown in Listing~\ref{fig:examplePropertiesFile}.
+An example \texttt{properties} file is shown in Figure~\ref{fig:examplePropertiesFile}.
 
+\begin{figure}
 \begin{minipage}{\linewidth}
-\begin{lstlisting}[caption=Example \texttt{properties} file contents, label=fig:examplePropertiesFile]
+\begin{lstlisting}
 #HATS catalog
 obs_collection=euclid_q1_merFinalCatalog
 dataproduct_type=object
@@ -394,6 +407,9 @@ hats_release_date=2024-09-18
 hats_version=v0.1
 \end{lstlisting}
 \end{minipage}
+\caption{Example \texttt{properties} file contents}
+\label{fig:examplePropertiesFile}
+\end{figure}
 
 We enforce additional requirements for the presence of particular fields for different types of HATS tables. 
 A matrix of these requirements is shown in Table~\ref{tab:propertyRequirements}.
@@ -501,13 +517,14 @@ obs\_collection &REQ &REQ &REQ &REQ &REQ \\
 \subsubsection{partition\_info.csv} 
 
 A text file named \texttt{partition\_info.csv} is OPTIONAL and RECOMMENDED in the root level of the catalog directory.
-If present, it MUST be a CSV (comma-separated-values) file, with the columns \texttt{"Norder"} and \texttt{"Npix"}, as shown in example contents in Listing~\ref{fig:examplePartitionInfoCsv}.
+If present, it MUST be a CSV (comma-separated-values) file, with the columns \texttt{"Norder"} and \texttt{"Npix"}, as shown in example contents in Figure~\ref{fig:examplePartitionInfoCsv}.
 Additional columns might be present in the file, but are not required, and may not be interpreted by all HATS readers.
 The values of pairs of \texttt{"Norder"} and \texttt{"Npix"} reflect the HEALPix tiles of the catalog's partitions. 
 HATS readers can quickly read this file to understand the full scope of the catalog, and potential spatial overlap with other catalogs.
 
+\begin{figure}
 \begin{minipage}{\linewidth}
-\begin{lstlisting}[caption=Example \texttt{partition\_info.csv} file contents, label=fig:examplePartitionInfoCsv]    
+\begin{lstlisting}
 Norder,Npix
 3,530
 4,637
@@ -516,11 +533,14 @@ Norder,Npix
 4,2147
 \end{lstlisting}
 \end{minipage}
+\caption{Example \texttt{partition\_info.csv} file contents}
+\label{fig:examplePartitionInfoCsv}
+\end{figure}
 
 \subsubsection{partition\_join\_info.csv} 
 
 A text file named \texttt{partition\_join\_info.csv} is OPTIONAL and RECOMMENDED in the root level of the catalog directory for an association catalog.
-If present, it MUST be a CSV (comma-separated-values) file, with the columns \texttt{"Norder"}, \texttt{"Npix"}, \texttt{"join\_Norder"}, and \texttt{"join\_Npix"}, as shown in example contents in Listing~\ref{fig:examplePartitionJoinInfoCsv}.
+If present, it MUST be a CSV (comma-separated-values) file, with the columns \texttt{"Norder"}, \texttt{"Npix"}, \texttt{"join\_Norder"}, and \texttt{"join\_Npix"}, as shown in example contents in Figure~\ref{fig:examplePartitionJoinInfoCsv}.
 Additional columns might be present in the file, but are not required, and may not be interpreted by all HATS readers.
 The values of pairs of \texttt{"Norder"} and \texttt{"Npix"} reflect the HEALPix tiles of the primary catalog's partitions. 
 The corresponding values of pairs of \texttt{"join\_Norder"} and \texttt{"join\_Npix"} reflect the HEALPix tiles of the join catalog's partitions that have matches inside the primary catalog's partition.
@@ -528,8 +548,9 @@ HATS readers can quickly read this file to understand the full spatial overlap w
 
 This file is not used for table types that are NOT association tables.
 
+\begin{figure}
 \begin{minipage}{\linewidth}
-\begin{lstlisting}[caption=Example \texttt{partition\_join\_info.csv} file contents, label=fig:examplePartitionJoinInfoCsv]    
+\begin{lstlisting}
 Norder,Npix,join_Norder,join_Npix
 3,530,3,517
 3,530,4,2120
@@ -538,6 +559,9 @@ Norder,Npix,join_Norder,join_Npix
 4,637,4,637
 \end{lstlisting}
 \end{minipage}
+\caption{Example \texttt{partition\_join\_info.csv} file contents}
+\label{fig:examplePartitionJoinInfoCsv}
+\end{figure}
 
 \subsubsection{point\_map.fits} 
 
@@ -611,10 +635,11 @@ The ordering of the keywords is not important.
 The keywords MAY include many of those listed in Table~\ref{tab:properties}, with collection-specific fields shown in Table~\ref{tab:propertyRequirements}.
 
 The text file may contain comment lines, beginning with the \texttt{'\#'} character.
-An example \texttt{properties} file is shown in Listing~\ref{fig:exampleCollectionPropertiesFile}.
+An example \texttt{properties} file is shown in Figure~\ref{fig:exampleCollectionPropertiesFile}.
 
+\begin{figure}
 \begin{minipage}{\linewidth}
-\begin{lstlisting}[caption=Example \texttt{collection.properties} file contents, label=fig:exampleCollectionPropertiesFile]
+\begin{lstlisting}
 #HATS Collection
 obs_collection=gaia_dr3
 hats_primary_table_url=gaia
@@ -623,6 +648,9 @@ default_margin=gaia_5arcs
 all_indexes=designation designation_index
 \end{lstlisting}
 \end{minipage}
+\caption{Example \texttt{collection.properties} file contents}
+\label{fig:exampleCollectionPropertiesFile}
+\end{figure}
 
 \section{Performance Considerations}
 Here, we will elaborate on several ways in which this format can be efficiently used. These insights come from our work with LSDB\footnote{\url{https://lsdb.io}}, a Python implementation of a package that works natively with HATS catalogs. \par

@@ -23,15 +23,10 @@ SOURCES = $(DOCNAME).tex gitmeta.tex
 
 # List of image files to be included in submitted package (anything that
 # can be rendered directly by common web browsers)
-FIGURES =
-
-# List of PDF figures (figures that must be converted to pixel images to
-# work in web browsers).
-VECTORFIGURES =
+FIGURES = margin-pix.png metadata_files.png order-pix.png leaf_files.png
 
 # Additional files to distribute (e.g., CSS, schema files, examples...)
 AUX_FILES =
-
 
 # List of PDF figures (figures that must be converted to pixel images to
 # work in web browsers).
