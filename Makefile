@@ -15,7 +15,7 @@ DOCTYPE = NOTE
 
 # An e-mail address of the person doing the submission to the document
 # repository (can be empty until a make upload is being made)
-AUTHOR_EMAIL=adrian.damian@nrc-cnrc.gc.ca
+AUTHOR_EMAIL=???
 
 # Source files for the TeX document (but the main file must always
 # be called $(DOCNAME).tex)
@@ -31,7 +31,6 @@ VECTORFIGURES =
 
 # Additional files to distribute (e.g., CSS, schema files, examples...)
 AUX_FILES =
-
 
 # List of PDF figures (figures that must be converted to pixel images to
 # work in web browsers).
