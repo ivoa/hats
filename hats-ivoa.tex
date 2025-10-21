@@ -652,7 +652,7 @@ all_indexes=designation designation_index
 \label{fig:exampleCollectionPropertiesFile}
 \end{figure}
 
-\section{Service Capabilities}
+\section{Service Capabilities}  \label{sec:capabilities}
 
 A single HATS dataset may be accessed in a variety of ways, and the VORegistry VOResource capabilities are intended to reflect the ways in which a user can interact with the data.
 HATS is expected to predominantly serve bulk download workloads, but custom services can also be placed on top.
@@ -878,6 +878,10 @@ Here we discuss the motivation behind our recommendations, and their consequence
 
 If the \texttt{\_common\_metadata} and \texttt{data\_thumbnail.parquet} files are not present, the VO metadata must be present in ALL data partitions to be considered VOParquet.
 
+\subsection{VOResource}
+
+Access to HATS catalogs can be discovered via the registry, in the form of VOResource entries.
+The capabilities were discussed in more detail in Section~\ref{sec:capabilities}.
 
 \subsection{Compatibility with other standards}
 

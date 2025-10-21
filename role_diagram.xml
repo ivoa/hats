@@ -38,7 +38,7 @@ of the various sections) to have the box centered.
 <archdiag xmlns="http://ivoa.net/archdiag">
 
 	<rec name="MOC" x="430" y="400"/>
-    
+  <rec name="HiPS" x="430" y="425"/>
   <rec name="VOTable" x="270" y="325"/>
   <rec name="VOParquet" x="440" y="470"/>
   <rec name="VOResource" x="55" y="155"/>
