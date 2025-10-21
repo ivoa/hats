@@ -39,7 +39,9 @@ of the various sections) to have the box centered.
 
 	<rec name="MOC" x="430" y="400"/>
     
-    <rec name="VOParquet" x="440" y="470"/>
+  <rec name="VOTable" x="270" y="325"/>
+  <rec name="VOParquet" x="440" y="470"/>
+  <rec name="VOResource" x="55" y="155"/>
 
 	<thisrec name="HATS" x="210" y="470"/>
 
