@@ -25,8 +25,6 @@
   showtabs=false,                  % show tabs within strings adding particular underscores
   tabsize=2,                       % sets default tabsize to 2 spaces
 }
-\usepackage{graphicx} 
-\usepackage{subcaption}
 
 \title{HATS: A Standard for the Hierarchical Adaptive Tiling Scheme in the Virtual Observatory}
 
@@ -131,10 +129,10 @@ catalog/
 |-- [REQUIRED] properties
 |-- [RECOMMENDED] partition_info.csv
 |-- [OPTIONAL] point_map.fits
-|-- [OPTIONAL] data_thumbnail.parquet
 +-- dataset/
     |-- [RECOMMENDED] _metadata
     |-- [RECOMMENDED] _common_metadata
+    |-- [OPTIONAL] data_thumbnail.parquet
     |-- Norder=0/
     |-- Norder=1/
     |-- Norder=2/
@@ -232,6 +230,7 @@ This process continues until all of the data is stored at the appropriate level 
 \label{fig:order}
 \end{figure}
 
+
 \subsubsection{Structure of Data Files} \label{sec:parquet}
 The astronomical data is stored in Parquet format\footnote{\href{https://parquet.apache.org}{https://parquet.apache.org}}.
 Parquet is a binary, columnar storage file format optimized for efficient data compression and retrieval.
@@ -239,29 +238,13 @@ It is ideal for storing large amounts of astronomical tabular data because it en
 Due to its widespread integration with popular processing frameworks such as Dask, Apache Spark, Hadoop, and cloud-native query engines, Parquet has become the de facto standard for analytical workloads in big data ecosystems.
 It is also widely adopted in cloud environments, such as Amazon S3 or Google Cloud Storage, and has libraries implemented for various programming languages, making it easy to work with Parquet files in different processing environments. \par
 
-Additional optional performance considerations for Parquet files is discussed in Section~\ref{sec:parquetPerformance}.
-
-\subsubsection{Spatial Index} \label{sec:spatialIndex}
-
-The HATS format RECOMMENDS that the first column of the dataset is a spatial index column named \texttt{\_healpix\_29}.
+The HATS format RECOMMENDS that the first column of the dataset is the \texttt{\_healpix\_29} index column.  
 \texttt{\_healpix\_29} stores the crucial spatial information about the position in the sky for each row, and it is not unique.
 This is calculated as the HEALPix order 29 value of the row's right ascension and declination (HEALPix order 29 correspond to the mean separation between HEALPix pixels of 0.000393 arcsec). 
 If two objects occur at the same location (or the data is individual observations of the same sky object), then multiple rows may have the same value for the \texttt{\_healpix\_29} column.
 The existence of this value speeds up downstream spatial calculations, and is beneficial for spatially-intensive applications.
 
-While this document RECOMMENDS the above name and HEALPix order of this column, implementation constraints can require different names or orders. 
-The name of the column and order at which it is calculated are specified in the \texttt{hats.properties} file (detailed in Section~\ref{}), as seen in Figure~\ref{healpix29Properties}.
-
-\begin{figure}
-\begin{minipage}{\linewidth}
-\begin{lstlisting}
-hats_healpix_col       = healpix29
-hats_healpix_col_order = 29
-\end{lstlisting} 
-\end{minipage} 
-\caption{Example properties for the HEALPix spatial index column}
-\label{fig:healpix29Properties}
-\end{figure}
+Additional optional performance considerations for Parquet files is discussed in Section~\ref{sec:parquetPerformance}.
 
 \subsection{Supplemental Tables} \label{sec:supplemental}
 
@@ -380,9 +363,10 @@ If there are many more or many fewer association links than there are objects in
 \subsection{Metadata and Auxiliary Files} \label{sec:meta}
 HATS implementations utilize auxiliary files and metadata files to store relevant information about the  structure, including:
 \begin{itemize}
-    \item \textbf{[REQUIRED] hats.properties}, at  \texttt{catalog} level    
+    \item \textbf{[REQUIRED] properties}, at  \texttt{catalog} level    
     \item \textbf{[RECOMMENDED] partition\_info.csv}, at  \texttt{catalog} level
-    \item \textbf{[OPTIONAL] skymap.fits}, at  \texttt{catalog} level
+    \item \textbf{[RECOMMENDED] partition\_join\_info.csv}, at  \texttt{catalog} level
+    \item \textbf{[OPTIONAL] point\_map.fits}, at  \texttt{catalog} level
     \item \textbf{[OPTIONAL] data\_thumbnail.parquet}, at  \texttt{catalog} level
     \item \textbf{[RECOMMENDED] \_metadata}, at  \texttt{catalog/dataset} level
     \item \textbf{[RECOMMENDED] \_common\_metadata}, at  \texttt{catalog/dataset} level
@@ -392,39 +376,38 @@ HATS implementations utilize auxiliary files and metadata files to store relevan
 Note that collection.properties is only required if creating a \texttt{catalog} collection for your dataset. \par 
 We will now go over these files and explain their function, format and their contents. 
     
-\subsubsection{hats.properties} 
+\subsubsection{properties} 
 
-A text file named \texttt{hats.properties} is REQUIRED in the root level of the catalog directory.
+A text file named \texttt{properties} is REQUIRED in the root level of the catalog directory.
 It marks the directory as containing a HATS catalog, and so MUST be located in the root directory of the catalog.
 It MUST be encoded in UTF-8, with one line per property, following the syntax \texttt{keyword = value}.
 The ordering of the keywords is not important. The keywords MAY include many of those listed in Table~\ref{tab:properties}.
 
-The text file may contain comment lines, beginning with the \texttt{'\#'} character. 
-Spaces between keyword, equal sign, and value are ignored, but can make the file more human-readable.
+The text file may contain comment lines, beginning with the \texttt{'\#'} character.
 
-An example \texttt{hats.properties} file is shown in Figure~\ref{fig:examplePropertiesFile}.
+An example \texttt{properties} file is shown in Figure~\ref{fig:examplePropertiesFile}.
 
 \begin{figure}
 \begin{minipage}{\linewidth}
 \begin{lstlisting}
 #HATS catalog
-obs_collection     = euclid_q1_merFinalCatalog
-dataproduct_type   = object
-hats_nrows         = 29767806
-hats_col_ra        = RIGHT_ASCENSION
-hats_col_dec       = DECLINATION
-hats_cols_sort     = OBJECT_ID
-hats_max_rows      = 1000000
-hats_order         = 6
-moc_sky_fraction   = 0.00618
-hats_builder       = hats-import v0.4.4
-hats_creation_date = 2025-03-20T03\:38UTC
-hats_estsize       = 23137775
-hats_release_date  = 2024-09-18
-hats_version       = v0.1
+obs_collection=euclid_q1_merFinalCatalog
+dataproduct_type=object
+hats_nrows=29767806
+hats_col_ra=RIGHT_ASCENSION
+hats_col_dec=DECLINATION
+hats_cols_sort=OBJECT_ID
+hats_max_rows=1000000
+hats_order=6
+moc_sky_fraction=0.00618
+hats_builder=hats-import v0.4.4
+hats_creation_date=2025-03-20T03\:38UTC
+hats_estsize=23137775
+hats_release_date=2024-09-18
+hats_version=v0.1
 \end{lstlisting}
 \end{minipage}
-\caption{Example \texttt{hats.properties} file contents}
+\caption{Example \texttt{properties} file contents}
 \label{fig:examplePropertiesFile}
 \end{figure}
 
@@ -464,7 +447,7 @@ hats\_coordinate\_epoch &For the default ra and dec (hats\_col\_ra, hats\_col\_d
 hats\_copyright &Copyright mention associated to the dataset or HATS - Format: free text \\
 hats\_creation\_date &HATS first creation date - Format: ISO 8601 => YYYY-mm-ddTHH:MMZ \\
 hats\_creator &Institute or person who built the HATS. Format: free text. Ex : CDS (T. Boch) \\
-hats\_estsize &HATS size estimation. Format: positive integer. Unit : KB \\
+hats\_estsize &HATS size estimation. Format: positive integer. Unit : KiB \\
 hats\_frame &Coordinate frame reference. Format: word "equatorial" (ICRS), "galactic", "ecliptic" \\
 hats\_index\_column &For index tables, the column that is indexed over \\
 hats\_index\_extra\_column &For index tables, extra columns that are carried through with the index \\
@@ -554,7 +537,33 @@ Norder,Npix
 \label{fig:examplePartitionInfoCsv}
 \end{figure}
 
-\subsubsection{skymap.fits} 
+\subsubsection{partition\_join\_info.csv} 
+
+A text file named \texttt{partition\_join\_info.csv} is OPTIONAL and RECOMMENDED in the root level of the catalog directory for an association catalog.
+If present, it MUST be a CSV (comma-separated-values) file, with the columns \texttt{"Norder"}, \texttt{"Npix"}, \texttt{"join\_Norder"}, and \texttt{"join\_Npix"}, as shown in example contents in Figure~\ref{fig:examplePartitionJoinInfoCsv}.
+Additional columns might be present in the file, but are not required, and may not be interpreted by all HATS readers.
+The values of pairs of \texttt{"Norder"} and \texttt{"Npix"} reflect the HEALPix tiles of the primary catalog's partitions. 
+The corresponding values of pairs of \texttt{"join\_Norder"} and \texttt{"join\_Npix"} reflect the HEALPix tiles of the join catalog's partitions that have matches inside the primary catalog's partition.
+HATS readers can quickly read this file to understand the full spatial overlap with other catalogs, and plan which leaf partitions of the primary and join catalogs will be loaded. \par
+
+This file is not used for table types that are NOT association tables.
+
+\begin{figure}
+\begin{minipage}{\linewidth}
+\begin{lstlisting}
+Norder,Npix,join_Norder,join_Npix
+3,530,3,517
+3,530,4,2120
+3,530,4,2121
+3,530,4,2122
+4,637,4,637
+\end{lstlisting}
+\end{minipage}
+\caption{Example \texttt{partition\_join\_info.csv} file contents}
+\label{fig:examplePartitionJoinInfoCsv}
+\end{figure}
+
+\subsubsection{point\_map.fits} 
 
 A FITS file containing the HEALPix skymap of the catalog.
 This is a two-dimensional histogram of points in each HEALPix tile at some reasonably high order.
@@ -562,41 +571,6 @@ This will be at the highest order calculated during the catalog ingestion proces
 This data is useful when inspecting catalogs and understanding the distribution of data. 
 
 This file is OPTIONAL and RECOMMENDED for object catalogs.
-
-HATS clients may find a \texttt{skymap.fits} file that has been generated at HEALPix order 9 to be very large, and more detail than they need.
-Down-sampled skymaps can provide a more manageable file size while still offering a useful overview of the data distribution. 
-These skymaps can be generated at lower HEALPix orders, allowing for quicker visualizations and analyses without the need for the full-resolution data.
-
-Additional skymaps are named \texttt{skymap.<healpix order>.fits}, within the same root directory of the catalog as the \texttt{skymap.fits} file, and are listed in the \texttt{hats.properties} file.
-
-Example snippets are shown in Figure~\ref{fig:skymapProperties}.
-For the example, we calculated the skymap at order 8 during catalog ingestion, and have written this to the \texttt{skymap.fits} file.
-Based on the data distribution, we have a highest HEALPix order of data partitions of 6.
-The catalog provider has downsampled the skymap to orders 2, 4, and 6. 
-We expect this catalog to have 4 skymap files at the root level: the primary and default at order 8, and 3 additional down-sampled files.
-
-\begin{figure}
-\begin{subfigure}[h]{0.5\linewidth}
-\begin{lstlisting}
-hats_skymap_order      = 8
-hats_skymap_alt_orders = 2 4 6
-hats_order             = 6
-\end{lstlisting}
-\caption{Example properties for the HEALPix order of skymaps}
-\end{subfigure}
-\hfill
-\begin{subfigure}[h]{0.4\linewidth}
-\begin{lstlisting}
-skymap.2.fits
-skymap.4.fits
-skymap.6.fits
-skymap.fits
-\end{lstlisting}
-\caption{Example skymaps in the root directory of the catalog}
-\end{subfigure}
-\caption{Example catalog with down-sampled skymaps}
-\label{fig:skymapProperties}
-\end{figure}
 
 \subsubsection{data\_thumbnail.parquet} 
 This is a small dataset aimed to help users to understand and use the data. 
@@ -661,7 +635,7 @@ The ordering of the keywords is not important.
 The keywords MAY include many of those listed in Table~\ref{tab:properties}, with collection-specific fields shown in Table~\ref{tab:propertyRequirements}.
 
 The text file may contain comment lines, beginning with the \texttt{'\#'} character.
-An example \texttt{collection.properties} file is shown in Figure~\ref{fig:exampleCollectionPropertiesFile}.
+An example \texttt{properties} file is shown in Figure~\ref{fig:exampleCollectionPropertiesFile}.
 
 \begin{figure}
 \begin{minipage}{\linewidth}
@@ -858,7 +832,7 @@ At the root level, both:
  \item recommend to have coverage information
  \begin{itemize}
   \item HiPS: \texttt{MOC.fits}
-  \item HATS: \texttt{partition\_info.csv} (recommended) and \texttt{skymap.fits} (density map, optional)
+  \item HATS: \texttt{partition\_info.csv} (recommended) and \texttt{point\_maps.fits} (density map, optional)
  \end{itemize}
  \item allow for an optional preview:
  \begin{itemize}
