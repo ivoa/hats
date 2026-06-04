@@ -652,6 +652,119 @@ all_indexes=designation designation_index
 \label{fig:exampleCollectionPropertiesFile}
 \end{figure}
 
+\section{Service Capabilities}  \label{sec:capabilities}
+
+A single HATS dataset may be accessed in a variety of ways, and the VORegistry VOResource capabilities are intended to reflect the ways in which a user can interact with the data.
+HATS is expected to predominantly serve bulk download workloads, but custom services can also be placed on top.
+
+\begin{figure}
+\begin{minipage}{\linewidth}
+\begin{lstlisting}
+<capability standardID="ivo://ivoa.net/std/hats#hats-1.0">
+  <interface role="std" version="1.0" xsi:type="vs:HTTP">
+    <accessURL>https://data.lsdb.io/hats/two_mass/</accessURL>
+  </interface>
+  <interface role="std" version="1.0" xsi:type="vs:ParamHTTP">
+    <accessURL>https://data.lsdb.io/hats/two_mass/</accessURL>
+    <resultType>binary/parquet</resultType>
+    <param>
+      <name>columns</name>
+      <description>Comma-separated columns of interest.</description>
+      <dataType>string</dataType>
+    </param>
+    <param>
+      <name>filters</name>
+      <description>Ampersand-separated row-level fitering.</description>
+      <dataType>string</dataType>
+    </param>
+  </interface>
+</capability>
+\end{lstlisting}
+\end{minipage}
+\caption{Example VOResource XML for single HATS catalog reachable through many resource capabilities}
+\label{fig:exampleCapabilityXML}
+\end{figure}
+
+\subsection{HTTP}
+
+A HATS catalog, as a set of flat files inside a directory structure, can be hosted with basic file storage and interpreted by a HATS-aware client.
+It is anticipated that this will be a cost-effective solution for many catalog providers.
+For users, they can stream data from the HTTP services directly, or can use the URLs to bulk download the entire catalog to some local storage.
+
+\subsection{ParamHTTP}
+
+The fact that the data can be stored on the hard drive and served to the users simplifies the cost structure for catalog providers. 
+However, a user operating on the dataset, even if they are doing aggressive filtering and requesting a minimal number of rows at the end, will still have to transfer a large amount of data to their client, where the filtering is actually conducted. 
+These limitations could become prohibitive if done over a network or with limited bandwidth. 
+
+To alleviate that problem, it is possible to implement a server-side query in which the filtering operations are done server-side, and only the final dataset is sent to a user. 
+Of course, this requires computational resources on the provider's side, but operates on a single file and will benefit from Parquet storage optimizations from Section~\ref{sec:parquetPerformance}
+
+We RECOMMEND providers accept additional URL query parameters that will perform server-side filtering.
+
+The service must respond to a HTTP GET request represented by a URL having two parts:
+
+\begin{enumerate}
+  \item A base URL of the form:
+\begin{verbatim}
+  http://<server-address>/<catalog>/Norder=<>/Dir=<>/Npix<>
+\end{verbatim}
+  where \texttt{<server-address>} and \texttt{<catalog>} are URI-compliant components indicating the domain address and local location path where the service is deployed. 
+  \texttt{Norder=<>}, \texttt{Dir=<>}, and \texttt{Npix<>} correspond to the pixel and directory parts described in more detail in Section~\ref{sec:catalog}
+  
+  \item Constraints expressed as a list of ampersand-delimited GET arguments of the form:
+\begin{verbatim}
+  ?[<key>=<value>&[<key>=<value>...]]<key>=<value>
+\end{verbatim}
+    where \texttt{<key>} is a parameter name specified by this specification and \texttt{<value>} is its value. 
+    The constraints represent the query parameters which can vary for each successive query. The order of the name-parameter pairs is not significant.
+    Note that when it contains extra GET arguments, the base URL ends in an ampersand, \texttt{\&}; if there are no extra arguments, then it ends in a question mark, \texttt{?}.
+\end{enumerate}
+
+The service MUST respond with a streamed binary parquet file. The contents of this file will vary based on further query parameter constraints.
+
+Services that accept additional query parameters SHOULD accept keys for \texttt{columns=} and \texttt{filters=}.
+These can be accepted in any order, but may not be duplicated within the same URL.
+
+\subsubsection{Column Filters}
+If requesting a subset of columns, they MAY be separated by a comma, space, or plus sign.
+
+The service is not required to return the columns in the same order they were requested in the query parameters.
+The service may return more columns than the user requested, e.g. the spatial index column described in Section~\ref{sec:spatialIndex}, and positional (radec) columns.
+
+\subsubsection{Row Filters}
+
+Additional row filters are specified with simple where-like clauses. 
+
+Consider the logical filter \texttt{Gmag>8.0} and \texttt{o\_Gmag>100} . 
+This would be represented in URL form as 
+\begin{verbatim}
+  http://<path>?filters=Gmag>8.0&o_Gmag>100
+\end{verbatim}
+
+or for an encoded URL
+\begin{verbatim}
+  http://<path>?filters%3DGmag%3E8.0%26o_Gmag%3E100
+\end{verbatim}
+
+Filters can be applied to numeric values (less than, equal, greater than), or equality for strings values.
+
+Clauses will be ANDed together (all criteria must be met to be a valid returned value).
+
+\subsubsection{Metadata}
+
+For VOParquet files, each leaf parquet file may contain the same VO metadata inside the file-level metadata. 
+This is plain text, has the potential to be large, and will necessarily be identical for all parquet files within a single HATS dataset.
+The additional metadata can be retrieved once and easily cached on the client's side.
+
+By default, the service should return any known additional key-value metadata in the parquet footer, but may suppress sending that additional metadata over the wire via a \texttt{metadata=False} parameter.
+
+\subsection{Object storage}
+
+\textbf{TODO} - should there be any mention of accessing parquet files over object storage? 
+Or if additional storage options may be required to access the data?
+Or that the same object bucket could be accessed with a \texttt{s3://} or \texttt{http://} path?
+
 \section{Performance Considerations}
 Here, we will elaborate on several ways in which this format can be efficiently used. These insights come from our work with LSDB\footnote{\url{https://lsdb.io}}, a Python implementation of a package that works natively with HATS catalogs. \par
 
@@ -664,13 +777,6 @@ Parquet readers can skip over entire row groups if they don't contain relevant d
 This is especially effective when row groups are designed to match the access patterns of a specific scientific use case. 
 For instance, if rowgroups are made to be small and sorted by the identification number of the survey, the retrieval of the individual rows by survey identification (discussed in Section  \ref{sec:index}) can be made much faster. 
 Speed-up happens because we don't have to load the entire Parquet file into memory, but only the smaller rowgroup, to retrieve the needed row with the required identification number.\par 
-
-\subsection{HTTP Services}
-The fact that the data can be stored on the hard drive and served to the users simplifies the cost structure for catalog providers. 
-However, a user operating on the dataset, even if they are doing aggressive filtering and requesting a minimal number of rows at the end, will still have to transfer a large amount of data to their client, where the filtering is actually conducted. 
-These limitations could become prohibitive if done over a network or with limited bandwidth. 
-To alleviate that problem, it is possible to implement a server-side query in which the filtering operations are done server-side, and only the final dataset is sent to a user. 
-Of course, this requires computational resources on the provider's side, but operates on a single file and will benefit from Parquet storage optimizations from Section~\ref{sec:parquetPerformance}
 
 \subsection{Cross-matching}
 Finally, we want to highlight the exceptional performance possible when cross-matching HATS catalogs. 
@@ -768,6 +874,10 @@ Here we discuss the motivation behind our recommendations, and their consequence
 
 If the \texttt{\_common\_metadata} and \texttt{data\_thumbnail.parquet} files are not present, the VO metadata must be present in ALL data partitions to be considered VOParquet.
 
+\subsection{VOResource}
+
+Access to HATS catalogs can be discovered via the registry, in the form of VOResource entries.
+The capabilities were discussed in more detail in Section~\ref{sec:capabilities}.
 
 \subsection{Compatibility with other standards}
 
