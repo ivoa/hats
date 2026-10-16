@@ -327,6 +327,10 @@ Instead, we have a flat storage of the parquet files, as shown in Figure~\ref{fi
 \label{fig:exampleIndexStructure}
 \end{figure}
 
+\subsubsection{Map Catalog} \label{sec:mapCatalog}
+
+\textcolor{red}{TODO: we should mention this, as it's very useful for science. }
+
 \subsubsection{Catalog Collection} \label{sec:collection}
 
 Margins and indexes are associated with a single astronomical dataset, and to make this connection clearer and enable friendlier application behavior, tables MAY be grouped together under a single directory called a catalog collection.
@@ -358,46 +362,169 @@ gaia_dr3/
 \label{fig:exampleCollectionStructure}
 \end{figure}
 
-\subsubsection{Association Table} \label{sec:association}
+\subsubsection{Linked Tables} \label{sec:linkedTables}
 
-Noting again that cross-matching and multi-survey analysis is a primary motivator for the HATS spatial format, we introduce the HATS association table. 
+Noting again that cross-matching and multi-survey analysis is a primary motivator for the HATS spatial format, we introduce linked tables.
+
+This mirrors the relational database notion of two tables that share a "join key" in both tables, and they can be joined at runtime to create a wider table.
+For each link, there is a single "primary" catalog that reflects the left side, and the other catalog is the "join" catalog (as the data can be joined into the primary catalog).
+
+The linked table should be a valid standalone catalog: the link is merely a convenience to users who will wish to perform this join, and won't need to know specifics of each table to do so.
+
+\paragraph{Example: Association Table} \label{sec:association}
 
 This table provides a spatially-sharded set of links between rows in two different object catalogs. 
 This mirrors the relational database notion of a link table, and will likely be composed of the primary survey identifiers from either side of the association.
-We make no prescription as to whether the relationships are one-to-one or one-to-many. \par
+We make no prescription as to whether the relationships are one-to-one or one-to-many.
 
-There is a single "primary" catalog that reflects the left side, and the other catalog is the "join" catalog (as the data can be joined into the primary catalog).
 The resulting association data will use the coordinates of the primary catalog, and MAY be partitioned with the same pixels as the primary catalog.
 If there are many more or many fewer association links than there are objects in the primary table, it may be preferable to either combine or split the leaf Parquet files further.
 
-% \subsubsection{Map Catalog} \label{sec:mapCatalog}
-% \textcolor{red}{TODO: we should mention this, as it's very useful for science. }
+\paragraph{Example: Extension Table} \label{sec:extensionTable}
 
-\subsection{Metadata and Auxiliary Files} \label{sec:meta}
+This table provides supplemental information that is not stored in the same leaf parquet files of the primary catalog. 
 
-HATS implementations utilize auxiliary files and metadata files to store relevant information about the structure.
-A HATS catalog may contain other arbitrary files in the catalog root directory level, as desired by the catalog publisher, or necessary for data access.
-A HATS reader MUST allow for unexpected files at the catalog root directory level.
+Some real-world examples where this is useful:
 
 \begin{itemize}
-    \item \textbf{[REQUIRED] hats.properties}, at  \texttt{catalog} level    
-    \item \textbf{[RECOMMENDED] partition\_info.csv}, at  \texttt{catalog} level
-    \item \textbf{[OPTIONAL] skymap.fits}, at  \texttt{catalog} level
-    \item \textbf{[REQUIRED] collection.properties}, at  \texttt{catalog} collection level
+    \item \textbf{Very wide catalog tables:} For a catalog table with more than 500 columns, it's likely that most scientists will only query or retrieve a small fraction of those columns.
+    Archives and other data providers may wish to move the rarely-used fields to an extension table, that can reside in cheaper storage regimes.
+    \item \textbf{Value-add catalog distribution:} Data products created after a survey release, or by other parties, would not be written back to the original catalog data structure.
+    A link provides a convenient way to attach the value-add products back to the survey data for joint analysis.
 \end{itemize}
-    
-Note that collection.properties is only required if creating a \texttt{catalog} collection for your dataset. \par 
-We will now go over these files and explain their function, format and their contents. 
-    
-\subsubsection{hats.properties} 
 
-A text file named \texttt{hats.properties} is REQUIRED in the root level of the catalog directory.
-It marks the directory as containing a HATS catalog, and so MUST be located in the root directory of the catalog.
+\subsection{Properties} \label{sec:meta}
+
+HATS implementations utilize auxiliary files and metadata files to store relevant information about the structure.
+We make use of a text-based properties file to store general configuration information, and a vocabulary convention for the keys contained in the files.
+
+\subsubsection{Format} 
+
+All \texttt{.properties} files use the same format.
+
 It MUST be encoded in UTF-8, with one line per property, following the syntax \texttt{keyword = value}.
 The ordering of the keywords is not important. The keywords MAY include many of those listed in Table~\ref{tab:properties}.
 
 The text file may contain comment lines, beginning with the \texttt{'\#'} character. 
 Spaces between keyword, equal sign, and value are ignored, but can make the file more human-readable.
+
+We enforce additional requirements for the presence of particular fields for different types of HATS catalogs or tables. 
+A matrix of these requirements is shown in Table~\ref{tab:propertyRequirements}.
+
+{\footnotesize
+\begin{longtable}[h!]{p{0.33\textwidth} p{0.67\textwidth}}
+\sptablerule
+\textbf{HATS Keyword}&\textbf{Description - Format - Example}\\
+\sptablerule
+\endhead
+
+addendum\_description &If content has been added after initial catalog creation, description of any added data - Format: free text \\
+addendum\_did &If content has been added after initial catalog creation, creator\_did of any added data \\
+all\_indexes &For catalog collections, space-delimited map of indexed field to subdirectories containing index tables. \\
+all\_margins &For catalog collections, space-delimited list of subdirectories containing margin caches. \\
+bib\_reference &Bibliographic reference \\
+bib\_reference\_url &URL to bibliographic reference \\
+creator\_did &Unique ID of the HATS - Format: IVOID - Ex : ivo://CDS/P/2MASS/J \\
+data\_ucd &UCD describing data contents \citep{ucd1plus2024} \\
+dataproduct\_type &Format: one word ONE OF(object, margin, link, index, collection, ...) \\
+default\_index &For catalog collections, the field of the default index to use for ID searches. \\
+default\_margin &For catalog collections, the subdirectory containing the default margin cache to use for cross-matching \\
+hats\_link\_join\_table\_url &For table links, there will be a join table with original survey data (right side of the join) \\
+hats\_link\_leaf\_files &For table links, does the table contain leaf files (may optionally only provide a "soft" link between tiles). \\
+hats\_builder &Name and version of the tool used for building the HATS. Format: free text -- Example "hats-import v0.6.4" \\
+hats\_col\_link\_join &For table links, column name for the joining (right) side of the join within the original table \\
+hats\_col\_link\_join\_link &For table links, column name in the assocation table for the join (right) side of the link. \\
+hats\_col\_link\_primary &For table links, column name for the primary (left) side of the join \\
+hats\_col\_link\_primary\_link &For table links, column name in the table that matches the primary (left) side of the join \\
+hats\_col\_healpix &Column name that provides a spatial index of HEALPix values at some fixed, high order \\
+hats\_col\_healpix\_order &For the \texttt{hats\_col\_healpix} column, what is the HEALPix order \\
+hats\_col\_dec &Column name of the dec coordinate. Used for partitioning and default cross-matching. \\
+hats\_col\_ra &Column name of the ra coordinate. Used for partitioning and default cross-matching. \\
+hats\_cols\_default &Which columns should be read from Parquet files, when user doesn't otherwise specify. Useful for wide tables. Format: space-delimited column names \\
+hats\_cols\_sort &Space-delimited list of the columns used to sort the data. If this isn't specified, it is assumed to be sorted by \texttt{hats\_col\_healpix} column (if present). \\
+hats\_cols\_survey\_id &The primary key used in the original survey data. May be multiple columns if the survey uses a composite key (e.g. object ID and MJD for detections) \\
+hats\_coordinate\_epoch &For the default ra and dec (hats\_col\_ra, hats\_col\_dec), the measurement epoch \\
+hats\_copyright &Copyright mention associated to the dataset or HATS - Format: free text \\
+hats\_creation\_date &HATS first creation date - Format: ISO 8601 => YYYY-mm-ddTHH:MMZ \\
+hats\_creator &Institute or person who built the HATS. Format: free text. Ex : CDS (T. Boch) \\
+hats\_estsize &HATS size estimation. Format: positive integer. Unit : KB \\
+hats\_frame &Coordinate frame reference. Format: word "equatorial" (ICRS), "galactic", "ecliptic" \\
+hats\_index\_column &For index tables, the column that is indexed over \\
+hats\_index\_extra\_column &For index tables, extra columns that are carried through with the index \\
+hats\_margin\_threshold &For margin tables, the threshold used for finding points within margin. Units: arcseconds \\
+hats\_max\_rows &At catalog creation time, the maximum number of rows per file before breaking into 4 new files at higher order. \\
+hats\_nrows &Number of rows of the HATS catalog. Format: positive integer \\
+hats\_order &Deepest HATS order. Format: positive integer \\
+hats\_primary\_table\_url &For supplemental tables, there will be a primary table with original survey data. Format: URL\\
+hats\_progenitor\_url &URL to an associated progenitor HATS catalog. Format: URL \\
+hats\_release\_date &Last HATS update date - Format: ISO 8601 => YYYY-mm-ddTHH:MMZ \\
+hats\_service\_url &HATS access url. Format: URL \\
+hats\_skymap\_order &HEALPix order of the default \texttt{'skymap.fits'} file \\
+hats\_skymap\_alt\_orders &space-delimited list of HEALPix orders for additional alternate skymap files. \\
+hats\_status &HATS status. Format: list of space-delimited words ("private" or "public"), ("main", "mirror", or "partial"), ("clonable", "unclonable" or "clonableOnce"). Default : public main clonableOnce \\
+hats\_successor\_description &If this HATS should be replaced with a newer catalog, description of replacement or reasoning. Format: free text \\
+hats\_successor\_url &URL to a newer HATS that replaces this catalog. Format: URL \\
+hats\_version &Number of HATS version. Format: 0.1 (corresponds to version of this note) \\
+moc\_sky\_fraction &Fraction of the sky covered by the MOC associated to the HATS. Format: real between 0 and 1 \\
+npix\_suffix & String to indicate file suffix for leaf files. In the typical HATS directory structure, this is \texttt{'.parquet'} or \texttt{'.pq'} because there is a single file in each Npix partition. If using leaf directories, \texttt{'/'}. \\
+obs\_ack &Acknowledgment. \\
+obs\_collection &Short name of original data set. Format: one word. Ex : 2MASS \\
+obs\_copyright &Copyright associated to the original data. Format: free text \\
+obs\_copyright\_url &URL to a copyright  \\
+obs\_description &Data set description. Format: free text, longer free text description of the dataset \\
+obs\_regime &General wavelength. Format: word: "Radio" | "Millimeter" | "Infrared" | "Optical" | "UV" | "EUV" | "X-ray" | "Gamma-ray" \\
+obs\_title &Data set title. Format: free text, one line. Ex : HST F110W observations \\
+product\_type\_served &If the HATS contains rich tabular data, specify the semantics of the data. Format: word:  "spectra" | "timeseries" | "image" \\
+prov\_progenitor &Provenance of the original data. Format: free text \\
+publisher\_id &Unique ID of the HATS publisher. Format: IVOID - Ex : ivo://CDS \\
+t\_max &Stop time of the observations. Format: real. Representation: MJD \\
+t\_min &Start time of the observations. Format: real. Representation: MJD \\
+\sptablerule    
+\caption{Available keys for properties file}
+\label{tab:properties}
+\end{longtable}}
+
+\begin{table}[h!]
+\rowcolors{2}{white}{gray!20}
+{\footnotesize\begin{tabular}{l c c c c c}
+\sptablerule
+\textbf{HATS Keyword} &\multicolumn{5}{c}{\textbf{HATS Catalog Type}} \\
+\rowcolor{white}
+& object & margin & index & link & collection \\
+\sptablerule
+all\_indexes & & & & &opt \\
+all\_margins & & & & &opt \\
+dataproduct\_type &REQ &REQ &REQ &REQ & \\
+default\_index & & & & &opt \\
+default\_margin & & & & &opt \\
+hats\_link\_join\_table\_url & & & &REQ & \\
+hats\_link\_leaf\_files & & & &REQ & \\
+hats\_col\_link\_join & & & &REQ & \\
+hats\_col\_link\_join\_link & & & &opt & \\
+hats\_col\_link\_primary & & & &REQ & \\
+hats\_col\_link\_primary\_link & & & &opt & \\
+hats\_col\_dec &REQ &opt & & & \\
+hats\_col\_ra &REQ &opt & & & \\
+hats\_cols\_default &opt &opt & & & \\
+hats\_index\_column & & &REQ & & \\
+hats\_index\_extra\_column & & &opt & & \\
+hats\_margin\_threshold & &REQ & & & \\
+hats\_npix\_suffix &opt &opt &opt &opt & \\
+hats\_nrows &REQ &REQ &REQ &REQ & \\
+hats\_primary\_table\_url & &REQ &REQ &REQ &REQ \\
+obs\_collection &REQ &REQ &REQ &REQ &REQ \\
+\sptablerule
+\end{tabular}}
+\caption{Catalog-type specific fields. For display, REQ is REQUIRED, and opt is OPTIONAL}
+\label{tab:propertyRequirements}
+\end{table}
+    
+\subsubsection{hats.properties} 
+
+A text file named \texttt{hats.properties} is REQUIRED in the root level of the catalog directory.
+It marks the directory as containing a HATS catalog, and so MUST be located in the root directory of the catalog.
+
+This is also REQUIRED for margin and index tables.
 
 An example \texttt{hats.properties} file is shown in Figure~\ref{fig:examplePropertiesFile}.
 
@@ -425,112 +552,42 @@ hats_version       = v1.0
 \label{fig:examplePropertiesFile}
 \end{figure}
 
-We enforce additional requirements for the presence of particular fields for different types of HATS tables. 
-A matrix of these requirements is shown in Table~\ref{tab:propertyRequirements}.
+\subsubsection{collection.properties}\label{sec:collectionProperties}
 
-{\footnotesize
-\begin{longtable}[h!]{p{0.33\textwidth} p{0.67\textwidth}}
-\sptablerule
-\textbf{HATS Keyword}&\textbf{Description - Format - Example}\\
-\sptablerule
-\endhead
+A text file named \texttt{collection.properties} is REQUIRED for a catalog collection.
+It marks the directory as containing a catalog collection, and so MUST be located in the 
+root of the catalog collection.
 
-addendum\_did &If content has been added after initial catalog creation, creator\_did of any added data \\
-all\_indexes &For catalog collections, space-delimited map of indexed field to subdirectories containing index tables. \\
-all\_margins &For catalog collections, space-delimited list of subdirectories containing margin caches. \\
-bib\_reference &Bibliographic reference \\
-bib\_reference\_url &URL to bibliographic reference \\
-creator\_did &Unique ID of the HATS - Format: IVOID - Ex : ivo://CDS/P/2MASS/J \\
-data\_ucd &UCD describing data contents \citep{ucd1plus2024} \\
-dataproduct\_type &Format: one word ONE OF(object, margin, association, index, ...) \\
-default\_index &For catalog collections, the field of the default index to use for ID searches. \\
-default\_margin &For catalog collections, the subdirectory containing the default margin cache to use for cross-matching \\
-hats\_assn\_join\_table\_url &For association tables, there will be a join table with original survey data (right side of the join) \\
-hats\_assn\_leaf\_files &For association tables, does the table contain leaf files (may optionally only provide a "soft" association between tiles). \\
-hats\_builder &Name and version of the tool used for building the HATS. Format: free text -- Example "hats-import v0.6.4" \\
-hats\_col\_assn\_join &For association tables, column name for the joining (right) side of the join within the original table \\
-hats\_col\_assn\_join\_assn &For association tables, column name in the assocation table for the join (right) side of the association table. \\
-hats\_col\_assn\_primary &For association tables, column name for the primary (left) side of the join \\
-hats\_col\_assn\_primary\_assn &For association tables, column name in the association table that matches the primary (left) side of the join \\
-hats\_col\_healpix &Column name that provides a spatial index of HEALPix values at some fixed, high order \\
-hats\_col\_healpix\_order &For the \texttt{hats\_col\_healpix} column, what is the HEALPix order \\
-hats\_col\_dec &Column name of the dec coordinate. Used for partitioning and default cross-matching. \\
-hats\_col\_ra &Column name of the ra coordinate. Used for partitioning and default cross-matching. \\
-hats\_cols\_default &Which columns should be read from Parquet files, when user doesn't otherwise specify. Useful for wide tables. Format: space-delimited column names \\
-hats\_cols\_sort &Space-delimited list of the columns used to sort the data. If this isn't specified, it is assumed to be sorted by \texttt{hats\_col\_healpix} column (if present). \\
-hats\_cols\_survey\_id &The primary key used in the original survey data. May be multiple columns if the survey uses a composite key (e.g. object ID and MJD for detections) \\
-hats\_coordinate\_epoch &For the default ra and dec (hats\_col\_ra, hats\_col\_dec), the measurement epoch \\
-hats\_copyright &Copyright mention associated to the dataset or HATS - Format: free text \\
-hats\_creation\_date &HATS first creation date - Format: ISO 8601 => YYYY-mm-ddTHH:MMZ \\
-hats\_creator &Institute or person who built the HATS. Format: free text. Ex : CDS (T. Boch) \\
-hats\_estsize &HATS size estimation. Format: positive integer. Unit : KB \\
-hats\_frame &Coordinate frame reference. Format: word "equatorial" (ICRS), "galactic", "ecliptic" \\
-hats\_index\_column &For index tables, the column that is indexed over \\
-hats\_index\_extra\_column &For index tables, extra columns that are carried through with the index \\
-hats\_margin\_threshold &For margin tables, the threshold used for finding points within margin. Units: arcseconds \\
-hats\_max\_rows &At catalog creation time, the maximum number of rows per file before breaking into 4 new files at higher order. \\
-hats\_nrows &Number of rows of the HATS catalog. Format: positive integer \\
-hats\_order &Deepest HATS order. Format: positive integer \\
-hats\_primary\_table\_url &For supplemental tables, there will be a primary table with original survey data. Format: URL\\
-hats\_progenitor\_url &URL to an associated progenitor HATS catalog. Format: URL \\
-hats\_release\_date &Last HATS update date - Format: ISO 8601 => YYYY-mm-ddTHH:MMZ \\
-hats\_service\_url &HATS access url. Format: URL \\
-hats\_skymap\_order &HEALPix order of the default \texttt{'skymap.fits'} file \\
-hats\_skymap\_alt\_orders &space-delimited list of HEALPix orders for additional alternate skymap files. \\
-hats\_status &HATS status. Format: list of space-delimited words ("private" or "public"), ("main", "mirror", or "partial"), ("clonable", "unclonable" or "clonableOnce"). Default : public main clonableOnce \\
-hats\_version &Number of HATS version. Format: 0.1 (corresponds to version of this note) \\
-moc\_sky\_fraction &Fraction of the sky covered by the MOC associated to the HATS. Format: real between 0 and 1 \\
-npix\_suffix & String to indicate file suffix for leaf files. In the typical HATS directory structure, this is \texttt{'.parquet'} or \texttt{'.pq'} because there is a single file in each Npix partition. If using leaf directories, \texttt{'/'}. \\
-obs\_ack &Acknowledgment. \\
-obs\_collection &Short name of original data set. Format: one word. Ex : 2MASS \\
-obs\_copyright &Copyright associated to the original data. Format: free text \\
-obs\_copyright\_url &URL to a copyright  \\
-obs\_description &Data set description. Format: free text, longer free text description of the dataset \\
-obs\_regime &General wavelength. Format: word: "Radio" | "Millimeter" | "Infrared" | "Optical" | "UV" | "EUV" | "X-ray" | "Gamma-ray" \\
-obs\_title &Data set title. Format: free text, one line. Ex : HST F110W observations \\
-prov\_progenitor &Provenance of the original data. Format: free text \\
-publisher\_id &Unique ID of the HATS publisher. Format: IVOID - Ex : ivo://CDS \\
-t\_max &Stop time of the observations. Format: real. Representation: MJD \\
-t\_min &Start time of the observations. Format: real. Representation: MJD \\
-\sptablerule    
-\caption{Available keys for properties file}
-\label{tab:properties}
-\end{longtable}}
+The keywords MAY include many of those listed in Table~\ref{tab:properties}, with collection-specific fields shown in Table~\ref{tab:propertyRequirements}.
 
-\begin{table}[h!]
-\rowcolors{2}{white}{gray!20}
-{\footnotesize\begin{tabular}{l c c c c c}
-\sptablerule
-\textbf{HATS Keyword} &\multicolumn{5}{c}{\textbf{HATS Catalog Type}} \\
-\rowcolor{white}
-& object & margin & index & association  & collection \\
-\sptablerule
-all\_indexes & & & & &opt \\
-all\_margins & & & & &opt \\
-dataproduct\_type &REQ &REQ &REQ &REQ & \\
-default\_index & & & & &opt \\
-default\_margin & & & & &opt \\
-hats\_assn\_join\_table\_url & & & &REQ & \\
-hats\_assn\_leaf\_files & & & &REQ & \\
-hats\_col\_assn\_join & & & &REQ & \\
-hats\_col\_assn\_join\_assn & & & &opt & \\
-hats\_col\_assn\_primary & & & &REQ & \\
-hats\_col\_assn\_primary\_assn & & & &opt & \\
-hats\_col\_dec &REQ &opt & & & \\
-hats\_col\_ra &REQ &opt & & & \\
-hats\_cols\_default &opt &opt & & & \\
-hats\_index\_column & & &REQ & & \\
-hats\_index\_extra\_column & & &opt & & \\
-hats\_margin\_threshold & &REQ & & & \\
-hats\_npix\_suffix &opt &opt &opt &opt & \\
-hats\_nrows &REQ &REQ &REQ &REQ & \\
-hats\_primary\_table\_url & &REQ &REQ &REQ &REQ \\
-obs\_collection &REQ &REQ &REQ &REQ &REQ \\
-\sptablerule
-\end{tabular}}
-\caption{Catalog-type specific fields. For display, REQ is REQUIRED, and opt is OPTIONAL}
-\label{tab:propertyRequirements}
-\end{table}
+An example \texttt{collection.properties} file is shown in Figure~\ref{fig:exampleCollectionPropertiesFile}.
+
+\begin{figure}
+\begin{minipage}{\linewidth}
+\begin{lstlisting}
+#HATS Collection
+obs_collection=gaia_dr3
+hats_primary_table_url=gaia
+all_margins=gaia_5arcs gaia_1arcs
+default_margin=gaia_5arcs
+all_indexes=designation designation_index
+\end{lstlisting}
+\end{minipage}
+\caption{Example \texttt{collection.properties} file contents}
+\label{fig:exampleCollectionPropertiesFile}
+\end{figure}
+
+\subsubsection{Linked table properties} 
+
+% \textcolor{red}{TODO: describe the properties. }
+
+\subsection{Metadata and Auxiliary Files} \label{sec:meta}
+
+A HATS catalog may contain other arbitrary files in the catalog root directory level, as desired by the catalog publisher, or necessary for data access.
+A HATS reader MUST allow for unexpected files at the catalog root directory level.
+
+Note that collection.properties is only required if creating a \texttt{catalog} collection for your dataset. \par 
+We will now go over these files and explain their function, format and their contents. 
 
 \subsubsection{partition\_info.csv} 
 
@@ -597,32 +654,6 @@ skymap.fits
 \end{subfigure}
 \caption{Example catalog with down-sampled skymaps}
 \label{fig:skymapProperties}
-\end{figure}
-
-\subsubsection{collection.properties}\label{sec:collectionProperties}
-A text file named \texttt{collection.properties} is REQUIRED for a catalog collection.
-It marks the directory as containing a catalog collection, and so MUST be located in the 
-root of the catalog collection.
-It MUST be encoded in UTF-8, with one line per property, following the syntax \texttt{keyword = value}.
-The ordering of the keywords is not important. 
-The keywords MAY include many of those listed in Table~\ref{tab:properties}, with collection-specific fields shown in Table~\ref{tab:propertyRequirements}.
-
-The text file may contain comment lines, beginning with the \texttt{'\#'} character.
-An example \texttt{collection.properties} file is shown in Figure~\ref{fig:exampleCollectionPropertiesFile}.
-
-\begin{figure}
-\begin{minipage}{\linewidth}
-\begin{lstlisting}
-#HATS Collection
-obs_collection=gaia_dr3
-hats_primary_table_url=gaia
-all_margins=gaia_5arcs gaia_1arcs
-default_margin=gaia_5arcs
-all_indexes=designation designation_index
-\end{lstlisting}
-\end{minipage}
-\caption{Example \texttt{collection.properties} file contents}
-\label{fig:exampleCollectionPropertiesFile}
 \end{figure}
 
 \subsubsection{Images and static summaries}
@@ -760,6 +791,20 @@ The key advantage lies in the fine-grained spatial partitioning: each data chunk
 
 For typical cases of large catalogs (more than billion rows), cross-matching on a single core is around 5 to 15\% slower than the pure I/O speed. 
 As discussed above, selecting only specific columns and parallelizing the work can drastically improve performance.   
+
+\section{Operational Considerations}
+
+\subsection{Provenance} 
+
+% \textcolor{red}{TODO: describe which properties relate to provenance, versioning, mirroring. }
+
+\subsection{Mirroring and versioning} 
+
+
+\subsection{Validation} 
+
+
+\subsection{Registry} 
 
 \section{Role within the VO Architecture}
 
